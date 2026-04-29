@@ -1,0 +1,45 @@
+You: hi
+Assistant: Hello! How can I assist you today?
+You: what movie should i watch today?
+Assistant: Choosing a movie can depend on your mood and preferences, but here are a few suggestions across different genres:
+
+1. **Action/Adventure**: *Mad Max: Fury Road* - A high-octane thrill ride with stunning visuals and intense action sequences.
+
+2. **Comedy**: *The Grand Budapest Hotel* - A quirky and visually delightful film with a unique sense of humor.
+
+3. **Drama**: *The Shawshank Redemption* - A classic tale of hope and friendship set in a prison.
+
+4. **Science Fiction**: *Inception* - A mind-bending thriller that explores the world of dreams.
+
+5. **Horror**: *Get Out* - A smart and socially conscious horror film with plenty of suspense.
+
+6. **Animated**: *Spider-Man: Into the Spider-Verse* - A visually stunning and innovative take on the superhero genre.
+
+7. **Romance**: *La La Land* - A modern musical with a nostalgic feel and a captivating love story.
+
+If you have a specific genre or type of movie in mind, let me know, and I can tailor my recommendations further!
+You: 1
+Assistant: Great choice! *Mad Max: Fury Road* is an exhilarating action film directed by George Miller. It's known for its incredible practical effects, intense chase sequences, and strong performances, particularly by Charlize Theron and Tom Hardy. The film is set in a post-apocalyptic wasteland and follows the story of Max Rockatansky as he teams up with Furiosa to escape a tyrannical warlord. Enjoy the ride! If you have any other questions or need more recommendations, feel free to ask.
+You: mad Max 
+Assistant: *Mad Max: Fury Road* is the fourth installment in the Mad Max franchise, released in 2015. Directed by George Miller, the film is celebrated for its breathtaking action sequences, practical effects, and strong visual storytelling. It takes place in a dystopian future where resources are scarce, and society has collapsed into chaos.
+
+The story follows Max Rockatansky, played by Tom Hardy, who becomes entangled with Imperator Furiosa, portrayed by Charlize Theron. Furiosa is on a mission to rescue a group of women from the tyrannical Immortan Joe, leading to a relentless and high-speed chase across the desert. The film is notable for its minimal dialogue, relying heavily on visual storytelling and action to convey its narrative.
+
+*Mad Max: Fury Road* received critical acclaim and won six Academy Awards, including Best Editing, Best Production Design, and Best Costume Design. It's praised for its innovative action sequences, strong performances, and its commentary on survival and redemption. If you enjoy high-energy action films with a unique visual style, this movie is a must-watch.
+You: /summary
+Summary: The conversation began with a greeting, followed by a request for a movie recommendation. I suggested several films across different genres, and the user expressed interest in *Mad Max: Fury Road*. I provided a brief overview of the film, highlighting its action-packed plot, strong performances, and critical acclaim.
+
+
+
+#####
+
+sqlite 
+(.venv) intellisys@intellisyss-mbp langgraph-learn % python module2/main.py \
+  --interactive \
+  --thread-id demo-sqlite \
+  --memory-db module2/graph_memory.sqlite
+Interactive mode. thread_id=demo-sqlite
+Commands: `/summary`, `/exit`, `/quit`
+You: do you remember the last message?
+Assistant: Yes, I remember the last message where we discussed *Spider-Man: Into the Spider-Verse*. I provided an overview of the film, highlighting its unique animation style, diverse cast of characters, and the themes it explores. If there's anything specific you'd like to know or discuss further about the movie, feel free to let me know!
+You: 
