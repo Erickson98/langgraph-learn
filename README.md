@@ -15,8 +15,7 @@ app/
     |-- main.py          # CLI parsing and process entrypoint only
     |-- dependencies.py  # model and dependency setup
     |-- schemas.py       # shared constants, typed config, and DTOs
-    |-- services/        # graph orchestration and business logic
-    `-- utils/           # small reusable helpers
+    `-- services/        # graph orchestration and business logic
 ```
 
 Rules:
@@ -26,6 +25,7 @@ Rules:
 - `dependencies.py` should use LangChain abstractions, such as `init_chat_model`, rather than vendor-specific chat classes.
 - Runtime settings should live in `app/config/settings.py` and be loaded through Pydantic `BaseSettings`.
 - Tests should cover pure service logic, CLI behavior, graph wiring with patched models, and any opt-in live provider checks.
+- Add folders such as `utils/` or `repositories/` only when the module actually needs them.
 
 ## Documentation
 
