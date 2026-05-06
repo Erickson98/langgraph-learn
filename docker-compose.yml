@@ -1,0 +1,19 @@
+services:
+  app:
+    build:
+      context: .
+      target: dev
+    image: langgraph-learn:local
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      LANGCHAIN_CHAT_MODEL: ${LANGCHAIN_CHAT_MODEL:-gpt-4o-mini}
+      LANGCHAIN_MODEL_PROVIDER: ${LANGCHAIN_MODEL_PROVIDER:-openai}
+      LANGCHAIN_TRACING: "false"
+      LANGCHAIN_TRACING_V2: "false"
+      LANGSMITH_TRACING: "false"
+      LANGSMITH_TRACING_V2: "false"
+      PYTHONPYCACHEPREFIX: /tmp/pycache
+    ports:
+      - "8000:8000"
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

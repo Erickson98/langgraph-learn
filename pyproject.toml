@@ -1,0 +1,52 @@
+[project]
+name = "langgraph-learn"
+version = "0.1.0"
+description = "LangGraph learning modules organized with package-style architecture."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "aiohttp>=3.13.4",
+    "cryptography>=46.0.7",
+    "fastapi",
+    "langchain>=1.2.17",
+    "langchain-anthropic>=1.4.0",
+    "langchain-community",
+    "langchain-core>=1.2.28",
+    "langchain-openai>=1.1.14",
+    "langchain-tavily",
+    "langchain-text-splitters>=1.1.2",
+    "langgraph",
+    "langgraph-checkpoint-sqlite",
+    "langgraph-prebuilt",
+    "langgraph-sdk",
+    "langsmith>=0.7.31",
+    "pygments>=2.20.0",
+    "pydantic-settings>=2.14.0",
+    "trustcall",
+    "uvicorn[standard]",
+    "wikipedia",
+]
+
+[dependency-groups]
+dev = [
+    "black>=25.1.0",
+    "langgraph-cli[inmem]",
+    "notebook",
+    "pre-commit>=4.0.0",
+    "pytest>=9.0.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+python_files = ["test_*.py"]
+addopts = "-ra"
+filterwarnings = [
+    "ignore::langchain_core._api.deprecation.LangChainPendingDeprecationWarning",
+]
+
+[tool.black]
+target-version = ["py311"]
+extend-exclude = '''
+^/app/module[2-5]/main\.py$
+'''
