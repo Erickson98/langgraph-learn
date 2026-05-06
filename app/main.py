@@ -8,6 +8,7 @@ from app.config.settings import get_settings
 from app.errors import register_error_handlers
 from app.logging import configure_logging, get_logger
 from app.module1.routers import router as module1_router
+from app.module2.routers import router as module2_router
 from app.routers import router as health_router
 
 logger = get_logger(__name__)
@@ -25,6 +26,7 @@ def create_app() -> FastAPI:
     register_error_handlers(app)
     app.include_router(health_router)
     app.include_router(module1_router)
+    app.include_router(module2_router)
     logger.info("FastAPI application configured")
     return app
 

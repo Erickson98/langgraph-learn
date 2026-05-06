@@ -7,4 +7,4 @@ repos:
     rev: 25.1.0
     hooks:
       - id: black
-        exclude: ^app/module[2-5]/main\.py$
+        exclude: ^app/module[3-5]/main\.py$

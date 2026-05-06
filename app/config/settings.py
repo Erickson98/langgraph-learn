@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     run_live_llm_tests: bool = False
     log_level: str = "INFO"
+    module2_memory_db: str = "data/module2.sqlite"
 
     model_config = SettingsConfigDict(
         env_file=".env",

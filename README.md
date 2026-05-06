@@ -33,6 +33,16 @@ Rules:
 - [Module 1 use case](docs/USE-CASE-MODULE1.md)
 - [Wiki index](wiki/index.md)
 
+## Modules
+
+| Module | Purpose | Runtime |
+| --- | --- | --- |
+| [Module 1](app/module1/README.md) | Arithmetic LangGraph agent with deterministic tools and FastAPI support. | API and CLI |
+| [Module 2](app/module2/README.md) | SQLite-backed chatbot that summarizes older conversation turns. | API and CLI |
+| [Module 3](app/module3/README.md) | Human-in-the-loop, checkpoint, state editing, replay, and streaming demos. | CLI |
+| [Module 4](app/module4/README.md) | Research brief generator with section planning and retrieval. | CLI |
+| [Module 5](app/module5/README.md) | Long-term memory productivity assistant for profile, todos, and preferences. | CLI |
+
 ## Tests
 
 Install dependencies from `pyproject.toml`:
@@ -56,6 +66,7 @@ LANGCHAIN_CHAT_MODEL=gpt-4o-mini
 LANGCHAIN_MODEL_PROVIDER=openai
 RUN_LIVE_LLM_TESTS=
 LOG_LEVEL=INFO
+MODULE2_MEMORY_DB=data/module2.sqlite
 ```
 
 Run the test suite:
@@ -106,6 +117,39 @@ Successful response:
 }
 ```
 
+Run a module 2 turn through the API:
+
+```bash
+curl -X POST http://127.0.0.1:8000/module2/turn \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "My favorite number is 7. Please remember it.",
+    "thread_id": "manual-module2",
+    "summarize_after": 6,
+    "model": "gpt-4o-mini",
+    "model_provider": "openai"
+  }'
+```
+
+Successful response:
+
+```json
+{
+  "response": "I will remember that your favorite number is 7.",
+  "summary": "",
+  "thread_id": "manual-module2",
+  "summarize_after": 6,
+  "model": "gpt-4o-mini",
+  "model_provider": "openai"
+}
+```
+
+Read the current module 2 summary for a thread:
+
+```bash
+curl "http://127.0.0.1:8000/module2/summary?thread_id=manual-module2"
+```
+
 Error responses use this shape:
 
 ```json
@@ -147,6 +191,8 @@ Then test the health endpoint:
 curl http://127.0.0.1:8000/health
 ```
 
+Module 2 SQLite memory is persisted through the `module2_data` Docker volume mounted at `/app/data`. The default database path is `data/module2.sqlite`, and you can override it with `MODULE2_MEMORY_DB`.
+
 Build the smaller runtime image without dev tools:
 
 ```bash
@@ -158,6 +204,7 @@ Run a module CLI by overriding the default API command:
 ```bash
 docker compose run --rm app python -m app.module1.main --help
 docker compose run --rm app python -m app.module1.main --prompt "What is 2 + 2?"
+docker compose run --rm app python -m app.module2.main --prompt "Remember that my favorite number is 7."
 ```
 
 Run tests in the container:

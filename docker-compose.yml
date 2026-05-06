@@ -9,6 +9,7 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       LANGCHAIN_CHAT_MODEL: ${LANGCHAIN_CHAT_MODEL:-gpt-4o-mini}
       LANGCHAIN_MODEL_PROVIDER: ${LANGCHAIN_MODEL_PROVIDER:-openai}
+      MODULE2_MEMORY_DB: ${MODULE2_MEMORY_DB:-data/module2.sqlite}
       LANGCHAIN_TRACING: "false"
       LANGCHAIN_TRACING_V2: "false"
       LANGSMITH_TRACING: "false"
@@ -16,4 +17,9 @@ services:
       PYTHONPYCACHEPREFIX: /tmp/pycache
     ports:
       - "8000:8000"
+    volumes:
+      - module2_data:/app/data
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+volumes:
+  module2_data:
