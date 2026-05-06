@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from typing import Annotated, TYPE_CHECKING
+
+from fastapi import Depends
 from langchain.chat_models import init_chat_model
 from langchain_core.language_models.chat_models import BaseChatModel
 
@@ -11,6 +14,9 @@ from app.module2.schemas import (
     DEFAULT_MODEL_PROVIDER,
     ChatModelConfig,
 )
+
+if TYPE_CHECKING:
+    from app.module2.services.module_service import Module2Service
 
 PROVIDER_API_KEYS = {
     "anthropic": "ANTHROPIC_API_KEY",
@@ -157,3 +163,19 @@ def get_chat_model(
         model_provider=config.model_provider,
         api_key=get_model_api_key(config.model_provider, settings=resolved_settings),
     )
+
+
+def get_module2_service(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> Module2Service:
+    """Build the module 2 application service for FastAPI injection.
+
+    Args:
+        settings: Runtime settings injected by FastAPI.
+
+    Returns:
+        Module 2 application service.
+    """
+    from app.module2.services.module_service import Module2Service
+
+    return Module2Service(settings=settings)

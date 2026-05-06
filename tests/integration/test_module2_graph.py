@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from langchain_core.messages import AIMessage
+from langchain_core.messages import AIMessage, BaseMessage
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langsmith.run_helpers import tracing_context
 
@@ -27,7 +27,7 @@ class FakeChatModel:
         """Create a fake model with an invocation recorder."""
         self.calls: list[list[str]] = []
 
-    def invoke(self, messages):
+    def invoke(self, messages: list[BaseMessage]) -> AIMessage:
         """Return deterministic assistant and summary messages."""
         contents = [getattr(message, "content", "") for message in messages]
         self.calls.append(contents)

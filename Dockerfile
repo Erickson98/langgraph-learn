@@ -8,8 +8,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-ARG UV_VERSION=0.11.5
-RUN pip install --no-cache-dir "uv==${UV_VERSION}"
+COPY --from=ghcr.io/astral-sh/uv:0.11.5 /uv /usr/local/bin/uv
 COPY pyproject.toml uv.lock README.md ./
 
 FROM base AS runtime

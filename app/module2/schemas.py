@@ -53,6 +53,12 @@ class Module2TurnResponse(BaseModel):
     model_provider: str
 
 
+class Module2SummaryRequest(BaseModel):
+    """Request query params for reading a module 2 summary."""
+
+    thread_id: str = DEFAULT_THREAD_ID
+
+
 class Module2SummaryResponse(BaseModel):
     """Response body for reading a module 2 thread summary."""
 

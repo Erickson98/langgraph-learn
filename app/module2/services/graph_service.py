@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from functools import partial
 from pathlib import Path
-from typing import Any, Literal
+from typing import Literal
 
+import anyio
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langchain_core.messages import (
     BaseMessage,
     HumanMessage,
@@ -44,7 +47,7 @@ class ConversationState(MessagesState):
 
 
 def build_graph(
-    checkpointer: Any,
+    checkpointer: BaseCheckpointSaver,
     summarize_after: int = DEFAULT_SUMMARIZE_AFTER,
     model: str = DEFAULT_MODEL,
     model_provider: str | None = None,
@@ -121,7 +124,7 @@ def build_graph(
     return workflow.compile(checkpointer=checkpointer)
 
 
-def build_state_reader_graph(checkpointer: Any) -> CompiledStateGraph:
+def build_state_reader_graph(checkpointer: BaseCheckpointSaver) -> CompiledStateGraph:
     """Build a graph shell that can read checkpointed conversation state.
 
     Args:
@@ -130,8 +133,12 @@ def build_state_reader_graph(checkpointer: Any) -> CompiledStateGraph:
     Returns:
         Compiled graph that exposes thread state without initializing an LLM.
     """
+
+    def noop(_: ConversationState) -> dict[str, list[BaseMessage]]:
+        return {}
+
     workflow = StateGraph(ConversationState)
-    workflow.add_node("noop", lambda state: {})
+    workflow.add_node("noop", noop)
     workflow.add_edge(START, "noop")
     workflow.add_edge("noop", END)
     return workflow.compile(checkpointer=checkpointer)
@@ -256,6 +263,44 @@ def run_turn_with_sqlite(
     return Module2TurnResult(response=response, summary=summary)
 
 
+async def run_turn_with_sqlite_async(
+    *,
+    prompt: str,
+    thread_id: str,
+    summarize_after: int = DEFAULT_SUMMARIZE_AFTER,
+    model: str = DEFAULT_MODEL,
+    model_provider: str | None = None,
+    memory_db: str | Path = DEFAULT_MEMORY_DB,
+    settings: Settings | None = None,
+) -> Module2TurnResult:
+    """Run one graph turn with a SQLite checkpointer without blocking the event loop.
+
+    Args:
+        prompt: User prompt.
+        thread_id: Conversation thread identifier.
+        summarize_after: Message-count threshold for summary compaction.
+        model: Chat model name used by the assistant node.
+        model_provider: Optional LangChain model provider name.
+        memory_db: SQLite checkpoint file path.
+        settings: Optional settings override for tests.
+
+    Returns:
+        Assistant response and the current summary for the thread.
+    """
+    return await anyio.to_thread.run_sync(
+        partial(
+            run_turn_with_sqlite,
+            prompt=prompt,
+            thread_id=thread_id,
+            summarize_after=summarize_after,
+            model=model,
+            model_provider=model_provider,
+            memory_db=memory_db,
+            settings=settings,
+        )
+    )
+
+
 def get_summary_with_sqlite(
     *,
     thread_id: str,
@@ -275,3 +320,26 @@ def get_summary_with_sqlite(
     with SqliteSaver.from_conn_string(memory_db_path) as memory:
         graph = build_state_reader_graph(memory)
         return get_summary(graph, thread_id)
+
+
+async def get_summary_with_sqlite_async(
+    *,
+    thread_id: str,
+    memory_db: str | Path = DEFAULT_MEMORY_DB,
+) -> str:
+    """Read a thread summary from SQLite without blocking the event loop.
+
+    Args:
+        thread_id: Conversation thread identifier.
+        memory_db: SQLite checkpoint file path.
+
+    Returns:
+        Current summary text, or an empty string when no summary exists.
+    """
+    return await anyio.to_thread.run_sync(
+        partial(
+            get_summary_with_sqlite,
+            thread_id=thread_id,
+            memory_db=memory_db,
+        )
+    )

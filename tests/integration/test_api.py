@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import tempfile
 from pathlib import Path
-from unittest.mock import ANY, patch
+from unittest.mock import ANY, AsyncMock, patch
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from langchain_core.messages import AIMessage
+from langchain_core.messages import AIMessage, BaseMessage
 from langsmith.run_helpers import tracing_context
 
 from app.config.settings import Settings, get_settings
@@ -20,7 +20,7 @@ from app.module2.services.graph_service import CREATE_SUMMARY_PROMPT
 class Module2FakeChatModel:
     """Small chat model test double for module 2 API integration tests."""
 
-    def invoke(self, messages):
+    def invoke(self, messages: list[BaseMessage]) -> AIMessage:
         """Return deterministic assistant and summary messages."""
         contents = [getattr(message, "content", "") for message in messages]
 
@@ -170,7 +170,8 @@ async def test_module2_turn_runs_graph_with_mocked_llm() -> None:
     transport = ASGITransport(app=app)
 
     with patch(
-        "app.module2.routers.run_turn_with_sqlite",
+        "app.module2.services.module_service.run_turn_with_sqlite_async",
+        new_callable=AsyncMock,
         return_value=Module2TurnResult(response="answer", summary="stored summary"),
     ) as run_turn_with_sqlite:
         async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -192,7 +193,7 @@ async def test_module2_turn_runs_graph_with_mocked_llm() -> None:
         "model": "gpt-4o-mini",
         "model_provider": "openai",
     }
-    run_turn_with_sqlite.assert_called_once_with(
+    run_turn_with_sqlite.assert_awaited_once_with(
         prompt="Remember this.",
         thread_id="api-thread",
         summarize_after=3,
