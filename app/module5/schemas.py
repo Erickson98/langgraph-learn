@@ -82,3 +82,34 @@ class UpdateMemory(BaseModel):
     """Tool call selected by the assistant when memory should be updated."""
 
     update_type: Literal["user", "todo", "instructions"]
+
+
+class Module5MemoryResponse(BaseModel):
+    """Serialized memory snapshot for one user."""
+
+    profile: str
+    todos: str
+    instructions: str
+
+
+class Module5ChatRequest(BaseModel):
+    """Request body for one module 5 conversation turn."""
+
+    prompt: str = Field(description="User message for this turn")
+    user_id: str = Field(
+        default=DEFAULT_USER_ID,
+        description="Long-term memory user id",
+    )
+    thread_id: str | None = Field(
+        default=None,
+        description="Checkpoint thread id; a new thread is created when omitted",
+    )
+
+
+class Module5ChatResponse(BaseModel):
+    """Response body for one module 5 conversation turn."""
+
+    response: str
+    thread_id: str
+    user_id: str
+    memory: Module5MemoryResponse

@@ -23,6 +23,7 @@ from langgraph.store.memory import InMemoryStore
 from trustcall import create_extractor
 
 from app.config.settings import Settings
+from app.logging import get_logger
 from app.module5.dependencies import get_chat_model
 from app.module5.schemas import (
     DEFAULT_MODEL,
@@ -33,6 +34,8 @@ from app.module5.schemas import (
     ToDo,
     UpdateMemory,
 )
+
+logger = get_logger(__name__)
 
 MODEL_SYSTEM_MESSAGE = """You are a helpful memory-based productivity assistant.
 
@@ -90,7 +93,7 @@ Return only the updated preference text.
 class BoundToolModelLike(Protocol):
     """Minimal tool-bound chat model protocol used by module 5."""
 
-    def invoke(self, messages: list[BaseMessage]) -> BaseMessage:
+    async def ainvoke(self, messages: list[BaseMessage]) -> BaseMessage:
         """Invoke the bound chat model.
 
         Args:
@@ -122,7 +125,7 @@ class ChatModelLike(Protocol):
         """
         ...
 
-    def invoke(self, messages: list[BaseMessage]) -> BaseMessage:
+    async def ainvoke(self, messages: list[BaseMessage]) -> BaseMessage:
         """Invoke the chat model.
 
         Args:
@@ -153,10 +156,15 @@ class Spy:
             if item.child_runs:
                 queue.extend(item.child_runs)
             if item.run_type == "chat_model":
-                tool_calls = item.outputs["generations"][0][0]["message"]["kwargs"].get(
-                    "tool_calls",
-                    [],
-                )
+                try:
+                    tool_calls = item.outputs["generations"][0][0]["message"][
+                        "kwargs"
+                    ].get("tool_calls", [])
+                except (KeyError, IndexError, TypeError):
+                    logger.warning(
+                        "Spy: unexpected run tree shape; skipping tool call capture"
+                    )
+                    tool_calls = []
                 if tool_calls:
                     self.called_tools.append(tool_calls)
 
@@ -177,8 +185,8 @@ def message_content_to_text(content: object) -> str:
         parts: list[str] = []
         for item in content:
             if isinstance(item, dict):
-                value = item.get("text", item.get("content", item))
-                parts.append(str(value))
+                text = item.get("text") or item.get("content")
+                parts.append(str(text) if text is not None else "")
             else:
                 parts.append(str(item))
         return "\n".join(parts)
@@ -266,7 +274,7 @@ def get_user_id(config: RunnableConfig | None) -> str:
     return DEFAULT_USER_ID
 
 
-def profile_to_text(store: BaseStore, user_id: str) -> str:
+async def profile_to_text(store: BaseStore, user_id: str) -> str:
     """Return the user's profile memory as text.
 
     Args:
@@ -276,13 +284,13 @@ def profile_to_text(store: BaseStore, user_id: str) -> str:
     Returns:
         Readable profile memory.
     """
-    memories = store.search(("profile", user_id))
+    memories = await store.asearch(("profile", user_id))
     if not memories:
         return "None"
     return str(memories[0].value)
 
 
-def todos_to_text(store: BaseStore, user_id: str) -> str:
+async def todos_to_text(store: BaseStore, user_id: str) -> str:
     """Return the user's todo memory as text.
 
     Args:
@@ -292,13 +300,13 @@ def todos_to_text(store: BaseStore, user_id: str) -> str:
     Returns:
         Readable todo memory.
     """
-    memories = store.search(("todo", user_id))
+    memories = await store.asearch(("todo", user_id))
     if not memories:
         return "None"
     return "\n".join(str(item.value) for item in memories)
 
 
-def instructions_to_text(store: BaseStore, user_id: str) -> str:
+async def instructions_to_text(store: BaseStore, user_id: str) -> str:
     """Return the user's task-management preferences as text.
 
     Args:
@@ -308,13 +316,13 @@ def instructions_to_text(store: BaseStore, user_id: str) -> str:
     Returns:
         Readable preference memory.
     """
-    memory = store.get(("instructions", user_id), "user_instructions")
+    memory = await store.aget(("instructions", user_id), "user_instructions")
     if not memory:
         return "None"
     return str(memory.value.get("memory", "None"))
 
 
-def get_memory_snapshot(store: BaseStore, user_id: str) -> MemorySnapshot:
+async def get_memory_snapshot(store: BaseStore, user_id: str) -> MemorySnapshot:
     """Read all module 5 memory for one user.
 
     Args:
@@ -325,9 +333,9 @@ def get_memory_snapshot(store: BaseStore, user_id: str) -> MemorySnapshot:
         Snapshot of profile, todos, and instructions.
     """
     return MemorySnapshot(
-        profile=profile_to_text(store, user_id),
-        todos=todos_to_text(store, user_id),
-        instructions=instructions_to_text(store, user_id),
+        profile=await profile_to_text(store, user_id),
+        todos=await todos_to_text(store, user_id),
+        instructions=await instructions_to_text(store, user_id),
     )
 
 
@@ -348,6 +356,32 @@ def latest_tool_call(state: MessagesState) -> dict[str, Any]:
     if not tool_calls:
         raise ValueError("Expected a tool call in the latest assistant message.")
     return tool_calls[0]
+
+
+def route_after_assistant(state: MessagesState) -> str:
+    """Route the graph after an assistant message.
+
+    Args:
+        state: LangGraph message state.
+
+    Returns:
+        Next node name or LangGraph END.
+
+    Raises:
+        ValueError: If the assistant emits an unsupported update type.
+    """
+    message = state["messages"][-1]
+    if not getattr(message, "tool_calls", None):
+        return END
+
+    update_type = message.tool_calls[0]["args"]["update_type"]
+    if update_type == "user":
+        return "update_profile"
+    if update_type == "todo":
+        return "update_todos"
+    if update_type == "instructions":
+        return "update_instructions"
+    raise ValueError(f"Unknown update type: {update_type}")
 
 
 def build_graph(
@@ -378,31 +412,31 @@ def build_graph(
     saver = checkpointer or MemorySaver()
     memory_store = store or InMemoryStore()
 
-    def assistant_node(
+    async def assistant_node(
         state: MessagesState,
         config: RunnableConfig,
         store: BaseStore,
     ) -> dict[str, list[BaseMessage]]:
         user_id = get_user_id(config)
         system_message = MODEL_SYSTEM_MESSAGE.format(
-            user_profile=profile_to_text(store, user_id),
-            todo=todos_to_text(store, user_id),
-            instructions=instructions_to_text(store, user_id),
+            user_profile=await profile_to_text(store, user_id),
+            todo=await todos_to_text(store, user_id),
+            instructions=await instructions_to_text(store, user_id),
         )
-        response = llm.bind_tools(
+        response = await llm.bind_tools(
             [UpdateMemory],
             parallel_tool_calls=False,
-        ).invoke([SystemMessage(content=system_message)] + state["messages"])
+        ).ainvoke([SystemMessage(content=system_message)] + state["messages"])
         return {"messages": [response]}
 
-    def update_profile(
+    async def update_profile(
         state: MessagesState,
         config: RunnableConfig,
         store: BaseStore,
     ) -> dict[str, list[ToolMessage]]:
         user_id = get_user_id(config)
         namespace = ("profile", user_id)
-        existing_items = store.search(namespace)
+        existing_items = await store.asearch(namespace)
         existing_memories = (
             [(item.key, "Profile", item.value) for item in existing_items]
             if existing_items
@@ -420,10 +454,12 @@ def build_graph(
             tool_choice="Profile",
             enable_inserts=True,
         )
-        result = extractor.invoke({"messages": merged, "existing": existing_memories})
+        result = await extractor.ainvoke(
+            {"messages": merged, "existing": existing_memories}
+        )
 
         for response, meta in zip(result["responses"], result["response_metadata"]):
-            store.put(
+            await store.aput(
                 namespace,
                 meta.get("json_doc_id", "profile"),
                 response.model_dump(mode="json"),
@@ -436,14 +472,14 @@ def build_graph(
             ]
         }
 
-    def update_todos(
+    async def update_todos(
         state: MessagesState,
         config: RunnableConfig,
         store: BaseStore,
     ) -> dict[str, list[ToolMessage]]:
         user_id = get_user_id(config)
         namespace = ("todo", user_id)
-        existing_items = store.search(namespace)
+        existing_items = await store.asearch(namespace)
         existing_memories = (
             [(item.key, "ToDo", item.value) for item in existing_items]
             if existing_items
@@ -462,10 +498,12 @@ def build_graph(
             tool_choice="ToDo",
             enable_inserts=True,
         ).with_listeners(on_end=spy)
-        result = extractor.invoke({"messages": merged, "existing": existing_memories})
+        result = await extractor.ainvoke(
+            {"messages": merged, "existing": existing_memories}
+        )
 
         for response, meta in zip(result["responses"], result["response_metadata"]):
-            store.put(
+            await store.aput(
                 namespace,
                 meta.get("json_doc_id", str(uuid4())),
                 response.model_dump(mode="json"),
@@ -481,23 +519,23 @@ def build_graph(
             ]
         }
 
-    def update_instructions(
+    async def update_instructions(
         state: MessagesState,
         config: RunnableConfig,
         store: BaseStore,
     ) -> dict[str, list[ToolMessage]]:
         user_id = get_user_id(config)
         namespace = ("instructions", user_id)
-        existing = store.get(namespace, "user_instructions")
+        existing = await store.aget(namespace, "user_instructions")
         system_message = CREATE_INSTRUCTIONS.format(
             current_instructions=existing.value["memory"] if existing else "None"
         )
-        response = llm.invoke(
+        response = await llm.ainvoke(
             [SystemMessage(content=system_message)]
             + state["messages"][:-1]
             + [HumanMessage(content="Update the task-management preferences.")]
         )
-        store.put(
+        await store.aput(
             namespace,
             "user_instructions",
             {"memory": message_content_to_text(response.content)},
@@ -526,33 +564,63 @@ def build_graph(
     return workflow.compile(checkpointer=saver, store=memory_store)
 
 
-def route_after_assistant(state: MessagesState) -> str:
-    """Route the graph after an assistant message.
+async def run_turn_with_sqlite_async(
+    *,
+    prompt: str,
+    user_id: str,
+    thread_id: str,
+    memory_db: str,
+    model: str = DEFAULT_MODEL,
+    model_provider: str | None = None,
+    settings: Settings | None = None,
+    store: BaseStore | None = None,
+) -> Module5TurnResult:
+    """Run one module 5 turn using a SQLite-backed checkpointer.
+
+    Conversation history is persisted to ``memory_db`` so it survives process
+    restarts.  The long-term memory ``store`` is kept alive by the caller; it
+    must be the same instance across requests so that profile, todos, and
+    instructions accumulate over time.
 
     Args:
-        state: LangGraph message state.
+        prompt: User prompt for this turn.
+        user_id: Long-term memory user id.
+        thread_id: Checkpoint thread id.
+        memory_db: SQLite file path, or ``':memory:'`` for ephemeral mode.
+        model: Chat model name.
+        model_provider: Optional LangChain model provider name.
+        settings: Optional settings override for tests.
+        store: Long-term memory store shared across requests.
 
     Returns:
-        Next node name or LangGraph END.
-
-    Raises:
-        ValueError: If the assistant emits an unsupported update type.
+        Assistant response and current memory snapshot.
     """
-    message = state["messages"][-1]
-    if not getattr(message, "tool_calls", None):
-        return END
+    from pathlib import Path
 
-    update_type = message.tool_calls[0]["args"]["update_type"]
-    if update_type == "user":
-        return "update_profile"
-    if update_type == "todo":
-        return "update_todos"
-    if update_type == "instructions":
-        return "update_instructions"
-    raise ValueError(f"Unknown update type: {update_type}")
+    from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+
+    memory_store = store or InMemoryStore()
+
+    if memory_db != ":memory:":
+        Path(memory_db).parent.mkdir(parents=True, exist_ok=True)
+
+    async with AsyncSqliteSaver.from_conn_string(memory_db) as checkpointer:
+        graph = build_graph(
+            model=model,
+            model_provider=model_provider,
+            settings=settings,
+            checkpointer=checkpointer,
+            store=memory_store,
+        )
+        return await run_turn(
+            graph,
+            prompt=prompt,
+            user_id=user_id,
+            thread_id=thread_id,
+        )
 
 
-def run_turn(
+async def run_turn(
     graph: CompiledStateGraph,
     *,
     prompt: str,
@@ -570,7 +638,7 @@ def run_turn(
     Returns:
         Assistant response and current memory snapshot.
     """
-    result = graph.invoke(
+    result = await graph.ainvoke(
         {"messages": [HumanMessage(content=prompt)]},
         config=build_config(user_id=user_id, thread_id=thread_id),
     )
@@ -579,5 +647,5 @@ def run_turn(
         response=message_content_to_text(final_message.content),
         thread_id=thread_id,
         user_id=user_id,
-        memory=get_memory_snapshot(graph.store, user_id),
+        memory=await get_memory_snapshot(graph.store, user_id),
     )

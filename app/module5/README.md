@@ -1,10 +1,32 @@
 # Module 5 Memory Productivity Agent
 
-Module 5 is a long-term memory assistant for profile facts, todos, and task-management preferences. It uses LangGraph with checkpointed conversation state and an in-memory store for long-term memory during the CLI session.
+Module 5 is a long-term memory assistant for profile facts, todos, and task-management preferences. It uses LangGraph with a SQLite-backed store for long-term memory (profile, todos, instructions) and an async SQLite checkpointer for conversation history. Both are persisted to the same file so that data survives process restarts.
+
+The module exposes a FastAPI surface alongside the CLI, following the same patterns as modules 2–4.
 
 ## Runtime
 
-The module currently runs through the CLI. The LLM is configured through `LANGCHAIN_CHAT_MODEL` and `LANGCHAIN_MODEL_PROVIDER`, with provider credentials loaded from shared settings.
+Configure the memory database path and model credentials in `.env`:
+
+```
+MODULE5_MEMORY_DB=data/module5.sqlite
+OPENAI_API_KEY=...
+```
+
+## API
+
+The module registers two routes under `/module5`:
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `POST` | `/module5/chat` | Send a message; returns the assistant reply and memory snapshot. |
+| `GET` | `/module5/memory/{user_id}` | Inspect stored profile, todos, and preferences for a user. |
+
+Start the API server:
+
+```bash
+uv run uvicorn app.main:app --reload
+```
 
 ## CLI
 
@@ -31,4 +53,4 @@ Inside the CLI:
 
 ## Tests
 
-Module 5 has unit coverage for dependency resolution, CLI parsing, graph helpers, and memory formatting. Integration tests cover LangGraph wiring with patched chat models and patched Trustcall extraction without live provider calls.
+Module 5 has unit coverage for dependency resolution, CLI parsing, graph helpers, memory formatting, the SQLite store, and the application service. Integration tests cover LangGraph wiring with patched chat models and patched Trustcall extraction without live provider calls. HTTP integration tests cover the `/chat` and `/memory` endpoints via the FastAPI test client.

@@ -18,6 +18,9 @@ from app.module2.services.graph_service import CREATE_SUMMARY_PROMPT
 from app.module3.schemas import Module3TurnResult, PendingToolCall
 from app.module4.schemas import ResearchBriefState
 from app.module4.services.graph_service import Module4GraphExecutionError
+from app.module5.dependencies import get_module5_service
+from app.module5.schemas import MemorySnapshot, Module5TurnResult
+from app.module5.services.module_service import Module5Service
 
 
 class Module2FakeChatModel:
@@ -701,3 +704,275 @@ async def test_module4_brief_returns_standard_error_for_runtime_failure() -> Non
             ),
         }
     }
+
+
+# ---------------------------------------------------------------------------
+# Module 5
+# ---------------------------------------------------------------------------
+
+
+def _module5_turn_result(
+    response: str = "Todo updated.",
+    thread_id: str = "module5-abc123",
+    user_id: str = "demo-user",
+) -> Module5TurnResult:
+    return Module5TurnResult(
+        response=response,
+        thread_id=thread_id,
+        user_id=user_id,
+        memory=MemorySnapshot(profile="None", todos="None", instructions="None"),
+    )
+
+
+@pytest.mark.anyio
+async def test_module5_chat_runs_turn_with_mocked_service() -> None:
+    """Module 5 chat endpoint should call the service and return its response."""
+    app = create_app()
+    fresh_store = __import__(
+        "langgraph.store.memory", fromlist=["InMemoryStore"]
+    ).InMemoryStore()
+    app.dependency_overrides[get_module5_service] = lambda: Module5Service(
+        settings=Settings(
+            _env_file=None,
+            openai_api_key="test-key",
+            module5_memory_db=":memory:",
+        ),
+        store=fresh_store,
+    )
+    transport = ASGITransport(app=app)
+
+    with patch(
+        "app.module5.services.module_service.run_turn_with_sqlite_async",
+        new_callable=AsyncMock,
+        return_value=_module5_turn_result(
+            response="I've noted that task.",
+            thread_id="module5-abc123",
+            user_id="user-1",
+        ),
+    ) as run_turn:
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post(
+                "/module5/chat",
+                json={
+                    "prompt": "I need to finish the report.",
+                    "user_id": "user-1",
+                    "thread_id": "module5-abc123",
+                },
+            )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["response"] == "I've noted that task."
+    assert body["thread_id"] == "module5-abc123"
+    assert body["user_id"] == "user-1"
+    assert "memory" in body
+    run_turn.assert_awaited_once_with(
+        prompt="I need to finish the report.",
+        user_id="user-1",
+        thread_id="module5-abc123",
+        memory_db=":memory:",
+        settings=ANY,
+        store=fresh_store,
+    )
+
+
+@pytest.mark.anyio
+async def test_module5_chat_generates_thread_id_when_omitted() -> None:
+    """Module 5 chat endpoint should accept requests without a thread_id."""
+    app = create_app()
+    fresh_store = __import__(
+        "langgraph.store.memory", fromlist=["InMemoryStore"]
+    ).InMemoryStore()
+    app.dependency_overrides[get_module5_service] = lambda: Module5Service(
+        settings=Settings(
+            _env_file=None, openai_api_key="test-key", module5_memory_db=":memory:"
+        ),
+        store=fresh_store,
+    )
+    transport = ASGITransport(app=app)
+
+    with patch(
+        "app.module5.services.module_service.run_turn_with_sqlite_async",
+        new_callable=AsyncMock,
+        return_value=_module5_turn_result(),
+    ):
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post(
+                "/module5/chat",
+                json={"prompt": "Hello"},
+            )
+
+    assert response.status_code == 200
+    assert response.json()["thread_id"]
+
+
+@pytest.mark.anyio
+async def test_module5_chat_returns_502_on_graph_failure() -> None:
+    """Module 5 chat endpoint should return 502 when the graph turn fails."""
+    app = create_app()
+    fresh_store = __import__(
+        "langgraph.store.memory", fromlist=["InMemoryStore"]
+    ).InMemoryStore()
+    app.dependency_overrides[get_module5_service] = lambda: Module5Service(
+        settings=Settings(
+            _env_file=None, openai_api_key="test-key", module5_memory_db=":memory:"
+        ),
+        store=fresh_store,
+    )
+    transport = ASGITransport(app=app)
+
+    with patch(
+        "app.module5.services.module_service.run_turn_with_sqlite_async",
+        new_callable=AsyncMock,
+        side_effect=RuntimeError("LLM timeout"),
+    ):
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post("/module5/chat", json={"prompt": "Hello"})
+
+    assert response.status_code == 502
+    assert response.json()["error"]["code"] == "chat_turn_failed"
+
+
+@pytest.mark.anyio
+async def test_module5_memory_returns_snapshot_for_user() -> None:
+    """Module 5 memory endpoint should return the current store contents."""
+    from langgraph.store.memory import InMemoryStore
+
+    store = InMemoryStore()
+    store.put(("profile", "user-1"), "profile", {"name": "Ada"})
+    store.put(("todo", "user-1"), "todo-1", {"task": "Ship module 5"})
+    store.put(
+        ("instructions", "user-1"),
+        "user_instructions",
+        {"memory": "Prioritize urgent tasks."},
+    )
+
+    app = create_app()
+    app.dependency_overrides[get_module5_service] = lambda: Module5Service(
+        settings=Settings(
+            _env_file=None, openai_api_key="test-key", module5_memory_db=":memory:"
+        ),
+        store=store,
+    )
+    transport = ASGITransport(app=app)
+
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.get("/module5/memory/user-1")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert "Ada" in body["profile"]
+    assert "Ship module 5" in body["todos"]
+    assert body["instructions"] == "Prioritize urgent tasks."
+
+
+@pytest.mark.anyio
+async def test_module5_memory_returns_none_placeholders_for_unknown_user() -> None:
+    """Module 5 memory endpoint should return 'None' for users with no memory."""
+    from langgraph.store.memory import InMemoryStore
+
+    app = create_app()
+    app.dependency_overrides[get_module5_service] = lambda: Module5Service(
+        settings=Settings(
+            _env_file=None, openai_api_key="test-key", module5_memory_db=":memory:"
+        ),
+        store=InMemoryStore(),
+    )
+    transport = ASGITransport(app=app)
+
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.get("/module5/memory/unknown-user")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["profile"] == "None"
+    assert body["todos"] == "None"
+    assert body["instructions"] == "None"
+
+
+@pytest.mark.anyio
+async def test_module5_chat_persists_sqlite_state_with_mocked_model() -> None:
+    """Module 5 chat should accumulate memory across turns using SQLite checkpointer."""
+    import asyncio
+
+    from langchain_core.messages import AIMessage, BaseMessage
+    from langgraph.store.memory import InMemoryStore
+
+    class FakeMemoryChatModel:
+        def bind_tools(
+            self, tools: list[object], *, parallel_tool_calls: bool = False
+        ) -> "FakeMemoryChatModel":
+            return self
+
+        async def ainvoke(self, messages: list[BaseMessage]) -> AIMessage:
+            await asyncio.sleep(0)
+            if any(message.type == "tool" for message in messages):
+                return AIMessage(content="Noted.")
+            return AIMessage(
+                content="",
+                tool_calls=[
+                    {
+                        "id": "call-1",
+                        "name": "UpdateMemory",
+                        "args": {"update_type": "todo"},
+                        "type": "tool_call",
+                    }
+                ],
+            )
+
+    class FakeExtractor:
+        def with_listeners(self, **_: object) -> "FakeExtractor":
+            return self
+
+        async def ainvoke(self, _: dict[str, object]) -> dict[str, object]:
+            await asyncio.sleep(0)
+            from app.module5.schemas import ToDo
+
+            return {
+                "responses": [ToDo(task="Ship module 5")],
+                "response_metadata": [{"json_doc_id": "todo-1"}],
+            }
+
+    with tempfile.TemporaryDirectory() as tmp:
+        memory_db = str(Path(tmp) / "module5.sqlite")
+        shared_store = InMemoryStore()
+
+        app = create_app()
+        app.dependency_overrides[get_module5_service] = lambda: Module5Service(
+            settings=Settings(
+                _env_file=None,
+                openai_api_key="test-key",
+                module5_memory_db=memory_db,
+            ),
+            store=shared_store,
+        )
+        transport = ASGITransport(app=app)
+
+        with (
+            patch(
+                "app.module5.services.graph_service.get_chat_model",
+                return_value=FakeMemoryChatModel(),
+            ),
+            patch(
+                "app.module5.services.graph_service.create_extractor",
+                return_value=FakeExtractor(),
+            ),
+            tracing_context(enabled=False),
+        ):
+            async with AsyncClient(
+                transport=transport, base_url="http://test"
+            ) as client:
+                first = await client.post(
+                    "/module5/chat",
+                    json={
+                        "prompt": "I need to ship module 5.",
+                        "user_id": "user-1",
+                        "thread_id": "thread-sqlite",
+                    },
+                )
+                memory = await client.get("/module5/memory/user-1")
+
+    assert first.status_code == 200
+    assert first.json()["response"] == "Noted."
+    assert memory.status_code == 200
+    assert "Ship module 5" in memory.json()["todos"]

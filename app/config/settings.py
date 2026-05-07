@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     module2_memory_db: str = "data/module2.sqlite"
     module3_memory_db: str = "data/module3.sqlite"
+    module5_memory_db: str = "data/module5.sqlite"
 
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -12,7 +12,14 @@ This is the running table of contents for the project.
 | `app/module2/` | SQLite-backed summarizing chatbot with API and CLI support. |
 | `app/module3/` | Checkpointing, breakpoint, approval, replay, and fork demos with API and CLI support. |
 | `app/module4/` | Research brief generator with section planning, retrieval, API, and CLI support. |
-| `app/module5/` | Long-term memory productivity assistant with profile, todo, and preference memory. |
+| `app/module5/` | Long-term memory productivity assistant with profile, todo, and preference memory, FastAPI surface, and SQLite-backed store. |
+| `app/module5/services/graph_service.py` | LangGraph graph builder, node functions, and `run_turn` helper. |
+| `app/module5/services/module_service.py` | Application service layer wrapping graph invocation for the API. |
+| `app/module5/services/sqlite_store.py` | `SqliteStore` — persistent `BaseStore` implementation backed by SQLite. |
+| `app/module5/routers.py` | FastAPI router exposing `POST /module5/chat` and `GET /module5/memory/{user_id}`. |
+| `app/module5/schemas.py` | Pydantic models for requests, responses, and internal graph state. |
+| `app/module5/dependencies.py` | FastAPI/CLI dependency wiring: chat model, credentials, and shared store. |
+| `app/module5/main.py` | CLI entry point with async REPL and `/memory` command. |
 | `tests/` | Unit and integration tests. |
 | `docs/` | Project and use-case documentation. |
 

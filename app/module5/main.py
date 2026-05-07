@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -12,6 +13,7 @@ if __package__ in {None, ""}:
     sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 from app.config.settings import Settings
+from app.logging import get_logger
 from app.module5.dependencies import (
     get_chat_model_config,
     get_required_api_key_name,
@@ -19,6 +21,8 @@ from app.module5.dependencies import (
     prepare_environment,
 )
 from app.module5.schemas import DEFAULT_USER_ID, ChatModelConfig, MemorySnapshot
+
+logger = get_logger(__name__)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -114,29 +118,57 @@ def run_chat(
         model_provider: LangChain model provider.
         settings: Runtime settings.
     """
-    from app.module5.services.graph_service import build_graph, new_thread_id, run_turn
+    asyncio.run(
+        _run_chat_async(
+            user_id=user_id,
+            model=model,
+            model_provider=model_provider,
+            settings=settings,
+        )
+    )
 
+
+async def _run_chat_async(
+    *,
+    user_id: str,
+    model: str,
+    model_provider: str,
+    settings: Settings,
+) -> None:
+    """Async implementation of the module 5 CLI chat loop.
+
+    Args:
+        user_id: Long-term memory user id.
+        model: Chat model name.
+        model_provider: LangChain model provider.
+        settings: Runtime settings.
+    """
+    from app.module5.services.graph_service import build_graph, new_thread_id, run_turn
+    from app.module5.services.sqlite_store import build_store
+
+    store = build_store(settings.module5_memory_db)
     graph = build_graph(
         model=model,
         model_provider=model_provider,
         settings=settings,
+        store=store,
     )
     thread_id = new_thread_id("module5")
 
-    print(f"Memory Agent started for user_id={user_id}")
+    logger.info("Memory Agent started for user_id=%s", user_id)
     print("Type /memory to inspect stored memory, /quit to exit.\n")
 
     while True:
-        user_input = input("You: ").strip()
+        user_input = (await asyncio.to_thread(input, "You: ")).strip()
         if not user_input:
             continue
         if user_input == "/quit":
             break
         if user_input == "/memory":
-            print_memory_snapshot(memory=run_turn_memory(graph, user_id))
+            print_memory_snapshot(memory=await run_turn_memory(graph, user_id))
             continue
 
-        result = run_turn(
+        result = await run_turn(
             graph,
             prompt=user_input,
             user_id=user_id,
@@ -145,7 +177,7 @@ def run_chat(
         print(f"Assistant: {result.response}\n")
 
 
-def run_turn_memory(graph: CompiledStateGraph, user_id: str) -> MemorySnapshot:
+async def run_turn_memory(graph: CompiledStateGraph, user_id: str) -> MemorySnapshot:
     """Read graph memory for the CLI.
 
     Args:
@@ -157,7 +189,7 @@ def run_turn_memory(graph: CompiledStateGraph, user_id: str) -> MemorySnapshot:
     """
     from app.module5.services.graph_service import get_memory_snapshot
 
-    return get_memory_snapshot(graph.store, user_id)
+    return await get_memory_snapshot(graph.store, user_id)
 
 
 def main() -> int:

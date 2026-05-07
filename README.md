@@ -44,7 +44,7 @@ Rules:
 | [Module 2](app/module2/README.md) | SQLite-backed chatbot that summarizes older conversation turns. | API and CLI |
 | [Module 3](app/module3/README.md) | Human-in-the-loop, checkpoint, state editing, replay, and streaming demos. | API and CLI |
 | [Module 4](app/module4/README.md) | Research brief generator with section planning and retrieval. | API and CLI |
-| [Module 5](app/module5/README.md) | Long-term memory productivity assistant for profile, todos, and preferences. | CLI |
+| [Module 5](app/module5/README.md) | Long-term memory productivity assistant for profile, todos, and preferences backed by SQLite. | API and CLI |
 
 ## Tests
 

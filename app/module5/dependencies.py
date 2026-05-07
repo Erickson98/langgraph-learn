@@ -2,11 +2,42 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Annotated
+
+from fastapi import Depends
 from langchain.chat_models import init_chat_model
 from langchain_core.language_models.chat_models import BaseChatModel
+from langgraph.store.base import BaseStore
 
 from app.config.settings import Settings, get_settings
 from app.module5.schemas import DEFAULT_MODEL, DEFAULT_MODEL_PROVIDER, ChatModelConfig
+
+if TYPE_CHECKING:
+    from app.module5.services.module_service import Module5Service
+
+# Lazily initialised on the first request.  The store type (SqliteStore or
+# InMemoryStore) is determined by module5_memory_db in Settings.
+
+_shared_store: BaseStore | None = None
+
+
+def _get_or_build_store(settings: Settings) -> BaseStore:
+    """Return the shared long-term memory store, building it on first call.
+
+    Args:
+        settings: Runtime settings that provide the database path.
+
+    Returns:
+        SqliteStore when a file path is configured, InMemoryStore for
+        the ':memory:' sentinel.
+    """
+    global _shared_store
+    if _shared_store is None:
+        from app.module5.services.sqlite_store import build_store
+
+        _shared_store = build_store(settings.module5_memory_db)
+    return _shared_store
+
 
 PROVIDER_API_KEYS = {
     "anthropic": "ANTHROPIC_API_KEY",
@@ -153,3 +184,23 @@ def get_chat_model(
         model_provider=config.model_provider,
         api_key=get_model_api_key(config.model_provider, settings=resolved_settings),
     )
+
+
+def get_module5_service(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> "Module5Service":
+    """Build the module 5 service for FastAPI dependency injection.
+
+    Each request receives a fresh service instance backed by a new SQLite
+    connection (via ``settings.module5_memory_db``) and the shared in-process
+    long-term memory store.
+
+    Args:
+        settings: Runtime settings injected by FastAPI.
+
+    Returns:
+        Module 5 application service.
+    """
+    from app.module5.services.module_service import Module5Service
+
+    return Module5Service(settings=settings, store=_get_or_build_store(settings))
