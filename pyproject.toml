@@ -48,5 +48,5 @@ filterwarnings = [
 [tool.black]
 target-version = ["py311"]
 extend-exclude = '''
-^/app/module[3-5]/main\.py$
+^/app/module[4-5]/main\.py$
 '''

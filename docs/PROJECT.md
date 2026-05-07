@@ -14,5 +14,4 @@ LangGraph Learn is a collection of small agent modules used to explore LangGraph
 
 ## Constraints
 
-Modules 2 through 5 have only been moved under `app/` so their internal refactor can happen in later iterations. Module 1 is the reference implementation for the folder pattern.
-
+Modules 1, 2, and 3 now follow the migrated folder pattern. Modules 4 and 5 have only been moved under `app/` so their internal refactor can happen in later iterations.

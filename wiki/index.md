@@ -9,8 +9,8 @@ This is the running table of contents for the project.
 | `app/main.py` | FastAPI application factory. |
 | `app/config/settings.py` | Shared Pydantic settings. |
 | `app/module1/` | Reference migrated LangGraph agent. |
-| `app/module2/` | Moved module placeholder for a later internal refactor. |
-| `app/module3/` | Moved module placeholder for a later internal refactor. |
+| `app/module2/` | SQLite-backed summarizing chatbot with API and CLI support. |
+| `app/module3/` | Checkpointing, breakpoint, approval, replay, and fork demos with API and CLI support. |
 | `app/module4/` | Moved module placeholder for a later internal refactor. |
 | `app/module5/` | Moved module placeholder for a later internal refactor. |
 | `tests/` | Unit and integration tests. |
@@ -22,8 +22,8 @@ This is the running table of contents for the project.
 | --- | --- |
 | [Project Context](../docs/PROJECT.md) | Project direction, constraints, and decisions. |
 | [Module 1 Use Case](../docs/USE-CASE-MODULE1.md) | Reference agent behavior and design decisions. |
+| [Module 3 Use Case](../docs/USE-CASE-MODULE3.md) | Checkpointing and human approval behavior. |
 
 ## Quick Start
 
 Install dependencies with `uv sync --all-groups`, run tests with `uv run pytest`, and run the API with `uv run uvicorn app.main:app --reload`.
-
