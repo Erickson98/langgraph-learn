@@ -10,6 +10,7 @@ from app.logging import configure_logging, get_logger
 from app.module1.routers import router as module1_router
 from app.module2.routers import router as module2_router
 from app.module3.routers import router as module3_router
+from app.module4.routers import router as module4_router
 from app.routers import router as health_router
 
 logger = get_logger(__name__)
@@ -29,6 +30,7 @@ def create_app() -> FastAPI:
     app.include_router(module1_router)
     app.include_router(module2_router)
     app.include_router(module3_router)
+    app.include_router(module4_router)
     logger.info("FastAPI application configured")
     return app
 

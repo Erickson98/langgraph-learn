@@ -43,10 +43,8 @@ python_files = ["test_*.py"]
 addopts = "-ra"
 filterwarnings = [
     "ignore::langchain_core._api.deprecation.LangChainPendingDeprecationWarning",
+    "ignore:Importing Send from langgraph.constants is deprecated.*:langgraph.warnings.LangGraphDeprecatedSinceV10:trustcall._base",
 ]
 
 [tool.black]
 target-version = ["py311"]
-extend-exclude = '''
-^/app/module[4-5]/main\.py$
-'''

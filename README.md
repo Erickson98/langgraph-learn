@@ -32,6 +32,8 @@ Rules:
 - [Project context](docs/PROJECT.md)
 - [Module 1 use case](docs/USE-CASE-MODULE1.md)
 - [Module 3 use case](docs/USE-CASE-MODULE3.md)
+- [Module 4 use case](docs/USE-CASE-MODULE4.md)
+- [Module 5 use case](docs/USE-CASE-MODULE5.md)
 - [Wiki index](wiki/index.md)
 
 ## Modules
@@ -41,7 +43,7 @@ Rules:
 | [Module 1](app/module1/README.md) | Arithmetic LangGraph agent with deterministic tools and FastAPI support. | API and CLI |
 | [Module 2](app/module2/README.md) | SQLite-backed chatbot that summarizes older conversation turns. | API and CLI |
 | [Module 3](app/module3/README.md) | Human-in-the-loop, checkpoint, state editing, replay, and streaming demos. | API and CLI |
-| [Module 4](app/module4/README.md) | Research brief generator with section planning and retrieval. | CLI |
+| [Module 4](app/module4/README.md) | Research brief generator with section planning and retrieval. | API and CLI |
 | [Module 5](app/module5/README.md) | Long-term memory productivity assistant for profile, todos, and preferences. | CLI |
 
 ## Tests
@@ -63,6 +65,7 @@ Edit `.env` and set the provider credentials you need:
 ```bash
 OPENAI_API_KEY=your_openai_key
 ANTHROPIC_API_KEY=
+TAVILY_API_KEY=
 LANGCHAIN_CHAT_MODEL=gpt-4o-mini
 LANGCHAIN_MODEL_PROVIDER=openai
 RUN_LIVE_LLM_TESTS=
@@ -180,6 +183,22 @@ curl "http://127.0.0.1:8000/module3/state?thread_id=manual-module3"
 curl "http://127.0.0.1:8000/module3/history?thread_id=manual-module3"
 ```
 
+Generate a module 4 research brief through the API:
+
+```bash
+curl -X POST http://127.0.0.1:8000/module4/brief \
+  -H "Content-Type: application/json" \
+  -d '{
+    "topic": "LangGraph for production support agents",
+    "audience": "engineering leadership",
+    "max_sections": 2,
+    "include_wikipedia": true,
+    "include_web": false,
+    "model": "gpt-4o-mini",
+    "model_provider": "openai"
+  }'
+```
+
 Error responses use this shape:
 
 ```json
@@ -194,7 +213,10 @@ Error responses use this shape:
 Live LLM integration tests are opt-in because they make provider API calls:
 
 ```bash
-RUN_LIVE_LLM_TESTS=1 uv run pytest tests/integration/test_module1_live_llm.py
+RUN_LIVE_LLM_TESTS=1 uv run pytest \
+  tests/integration/test_module1_live_llm.py \
+  tests/integration/test_module2_live_llm.py \
+  tests/integration/test_module4_live_llm.py
 ```
 
 ## Docker
@@ -236,6 +258,8 @@ docker compose run --rm app python -m app.module1.main --help
 docker compose run --rm app python -m app.module1.main --prompt "What is 2 + 2?"
 docker compose run --rm app python -m app.module2.main --prompt "Remember that my favorite number is 7."
 docker compose run --rm app python -m app.module3.main breakpoints --auto-approve
+docker compose run --rm app python -m app.module4.main "LangGraph for production support agents" --sections 2 --no-web
+docker compose run --rm app python -m app.module5.main --user-id demo-user
 ```
 
 Run tests in the container:
@@ -247,7 +271,10 @@ docker compose run --rm app python -m pytest
 Run the opt-in live LLM test:
 
 ```bash
-docker compose run --rm -e RUN_LIVE_LLM_TESTS=1 app python -m pytest tests/integration/test_module1_live_llm.py
+docker compose run --rm -e RUN_LIVE_LLM_TESTS=1 app python -m pytest \
+  tests/integration/test_module1_live_llm.py \
+  tests/integration/test_module2_live_llm.py \
+  tests/integration/test_module4_live_llm.py
 ```
 
 If you want to pass a different env file manually, put `--env-file` before `run`:

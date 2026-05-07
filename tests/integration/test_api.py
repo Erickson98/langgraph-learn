@@ -16,6 +16,8 @@ from app.main import create_app
 from app.module2.schemas import Module2TurnResult
 from app.module2.services.graph_service import CREATE_SUMMARY_PROMPT
 from app.module3.schemas import Module3TurnResult, PendingToolCall
+from app.module4.schemas import ResearchBriefState
+from app.module4.services.graph_service import Module4GraphExecutionError
 
 
 class Module2FakeChatModel:
@@ -530,3 +532,172 @@ async def test_module3_api_persists_sqlite_state_with_mocked_model() -> None:
     assert approve_response.status_code == 200
     assert approve_response.json()["status"] == "completed"
     assert approve_response.json()["response"] == "tool-count=4 answer=6"
+
+
+@pytest.mark.anyio
+async def test_module4_brief_runs_graph_with_mocked_llm() -> None:
+    """Module 4 API should call the graph service without live retrieval or LLMs."""
+    state: ResearchBriefState = {
+        "topic": "LangGraph",
+        "audience": "leaders",
+        "max_sections": 1,
+        "include_wikipedia": True,
+        "include_web": False,
+        "planned_sections": [],
+        "completed_sections": [
+            {
+                "order": 1,
+                "key": "01-adoption",
+                "title": "Adoption",
+                "markdown": "### Adoption\nUse bounded pilots.",
+                "sources": ["[W1] https://wiki"],
+            }
+        ],
+        "overview": "- Start with a bounded pilot.",
+        "final_report": "# Research Brief: LangGraph",
+    }
+    app = create_app()
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        _env_file=None,
+        langchain_chat_model="gpt-4o-mini",
+        langchain_model_provider="openai",
+        openai_api_key="test-key",
+    )
+    transport = ASGITransport(app=app)
+
+    with patch(
+        "app.module4.services.module_service.run_brief_async",
+        new_callable=AsyncMock,
+        return_value=state,
+    ) as run_brief:
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post(
+                "/module4/brief",
+                json={
+                    "topic": "LangGraph",
+                    "audience": "leaders",
+                    "max_sections": 1,
+                    "include_web": False,
+                },
+            )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "topic": "LangGraph",
+        "audience": "leaders",
+        "max_sections": 1,
+        "overview": "- Start with a bounded pilot.",
+        "final_report": "# Research Brief: LangGraph",
+        "sections": [
+            {
+                "order": 1,
+                "key": "01-adoption",
+                "title": "Adoption",
+                "markdown": "### Adoption\nUse bounded pilots.",
+                "sources": ["[W1] https://wiki"],
+            }
+        ],
+        "sources": ["[W1] https://wiki"],
+        "model": "gpt-4o-mini",
+        "model_provider": "openai",
+    }
+    run_brief.assert_awaited_once_with(
+        topic="LangGraph",
+        audience="leaders",
+        max_sections=1,
+        include_wikipedia=True,
+        include_web=False,
+        model="gpt-4o-mini",
+        model_provider="openai",
+        settings=ANY,
+    )
+
+
+@pytest.mark.anyio
+async def test_module4_brief_returns_standard_error_for_unknown_provider() -> None:
+    """Module 4 API should return a stable error body for bad providers."""
+    app = create_app()
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        _env_file=None,
+        langchain_chat_model="gpt-4o-mini",
+        langchain_model_provider="openai",
+        openai_api_key="test-key",
+    )
+    transport = ASGITransport(app=app)
+
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/module4/brief",
+            json={
+                "topic": "LangGraph",
+                "model_provider": "opneai",
+            },
+        )
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "unsupported_model_provider"
+    assert "Unsupported model provider 'opneai'" in response.json()["error"]["message"]
+
+
+@pytest.mark.anyio
+async def test_module4_brief_returns_standard_error_for_missing_credentials() -> None:
+    """Module 4 API should return a stable error body when credentials are absent."""
+    app = create_app()
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        _env_file=None,
+        langchain_chat_model="gpt-4o-mini",
+        langchain_model_provider="openai",
+        openai_api_key="",
+    )
+    transport = ASGITransport(app=app)
+
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/module4/brief",
+            json={"topic": "LangGraph"},
+        )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "error": {
+            "code": "missing_model_credentials",
+            "message": "OPENAI_API_KEY is not set for provider 'openai'.",
+        }
+    }
+
+
+@pytest.mark.anyio
+async def test_module4_brief_returns_standard_error_for_runtime_failure() -> None:
+    """Module 4 API should wrap provider and graph runtime failures."""
+    app = create_app()
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        _env_file=None,
+        langchain_chat_model="gpt-4o-mini",
+        langchain_model_provider="openai",
+        openai_api_key="test-key",
+    )
+    transport = ASGITransport(app=app)
+
+    with patch(
+        "app.module4.services.module_service.run_brief_async",
+        new_callable=AsyncMock,
+        side_effect=Module4GraphExecutionError(
+            "Brief generation failed while calling the model or retrieval providers."
+        ),
+    ):
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post(
+                "/module4/brief",
+                json={"topic": "LangGraph"},
+            )
+
+    assert response.status_code == 502
+    assert response.json() == {
+        "error": {
+            "code": "brief_generation_failed",
+            "message": (
+                "Brief generation failed while calling the model or retrieval "
+                "providers."
+            ),
+        }
+    }

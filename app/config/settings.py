@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     langchain_model_provider: str = "openai"
     openai_api_key: str = ""
     anthropic_api_key: str = ""
+    tavily_api_key: str = ""
     run_live_llm_tests: bool = False
     log_level: str = "INFO"
     module2_memory_db: str = "data/module2.sqlite"
