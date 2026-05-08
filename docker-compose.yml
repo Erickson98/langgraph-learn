@@ -12,6 +12,7 @@ services:
       LANGCHAIN_MODEL_PROVIDER: ${LANGCHAIN_MODEL_PROVIDER:-openai}
       MODULE2_MEMORY_DB: ${MODULE2_MEMORY_DB:-data/module2.sqlite}
       MODULE3_MEMORY_DB: ${MODULE3_MEMORY_DB:-data/module3.sqlite}
+      MODULE5_MEMORY_DB: ${MODULE5_MEMORY_DB:-data/module5.sqlite}
       LANGCHAIN_TRACING: "false"
       LANGCHAIN_TRACING_V2: "false"
       LANGSMITH_TRACING: "false"
