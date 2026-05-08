@@ -38,6 +38,8 @@ def build_graph(
     )
     llm_with_tools = llm.bind_tools(ARITHMETIC_TOOLS)
 
+    # Bind the configured model once per compiled graph so each thread uses
+    # the same provider settings while LangGraph manages message state.
     def assistant(state: MessagesState) -> dict[str, list[BaseMessage]]:
         response = llm_with_tools.invoke([SYSTEM_MESSAGE] + state["messages"])
         return {"messages": [response]}
@@ -46,6 +48,7 @@ def build_graph(
     builder.add_node("assistant", assistant)
     builder.add_node("tools", ToolNode(ARITHMETIC_TOOLS))
     builder.add_edge(START, "assistant")
+    # tools_condition routes model tool calls to ToolNode and otherwise ends.
     builder.add_conditional_edges("assistant", tools_condition)
     builder.add_edge("tools", "assistant")
 
