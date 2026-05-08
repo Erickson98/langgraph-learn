@@ -1,3 +1,25 @@
+"""Module 5 CLI entry point.
+
+Runs the long-term memory productivity assistant from the command line.
+The agent maintains three types of persistent memory — user profile, todo
+list, and task-management preferences — stored in SQLite so they survive
+process restarts.
+
+The REPL loop accepts natural language.  Special commands:
+
+- ``/memory``  — print the current profile, todos, and preferences.
+- ``/quit``    — exit the session.
+
+Usage examples::
+
+    uv run python -m app.module5.main --user-id demo-user
+
+    uv run python -m app.module5.main \\
+        --model claude-3-5-haiku-latest \\
+        --model-provider anthropic \\
+        --user-id alice
+"""
+
 from __future__ import annotations
 
 import argparse

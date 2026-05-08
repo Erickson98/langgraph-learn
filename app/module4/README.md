@@ -1,6 +1,18 @@
 # Module 4 Research Brief Agent
 
-Module 4 plans and writes a concise research brief. It uses LangGraph to split the work into section planning, per-section retrieval, section drafting, overview synthesis, and final markdown compilation.
+Module 4 plans and writes a structured research brief on any topic. It uses a main LangGraph graph with a `Send`-powered fan-out to per-section subgraphs, demonstrating parallel node dispatch, structured LLM output, multi-source retrieval, and report compilation.
+
+Graph flow:
+
+```
+START → plan_sections → [Send × N] → build_section → write_overview → compile_report → END
+```
+
+Each `build_section` subgraph runs independently:
+
+```
+START → plan_retrieval_queries → [search_wikipedia ‖ search_web] → draft_section → END
+```
 
 ## Runtime
 
@@ -47,6 +59,19 @@ Write the markdown report to disk:
 uv run python -m app.module4.main "AI sourcing research" \
   --output data/module4-brief.md
 ```
+
+## File map
+
+| File | Purpose |
+| --- | --- |
+| `schemas.py` | State types (`ResearchBriefState`, `SectionSubgraphState`), planning and retrieval models, request/response DTOs |
+| `dependencies.py` | Provider validation, credential checking, `get_chat_model`, FastAPI DI |
+| `routers.py` | `POST /module4/brief` |
+| `services/graph_service.py` | Main graph and section subgraph builders, `run_brief`, async wrapper |
+| `services/retrieval_service.py` | Wikipedia and Tavily retrieval with graceful fallback |
+| `services/text.py` | `clip`, `dedupe`, `message_content_to_text`, `slugify` helpers |
+| `services/module_service.py` | Application service used by the router |
+| `main.py` | CLI entry point |
 
 ## Tests
 

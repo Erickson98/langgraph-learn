@@ -1,3 +1,25 @@
+"""Module 3 CLI entry point.
+
+Runs nine LangGraph demos from the command line, each highlighting a different
+checkpointing or human-in-the-loop pattern:
+
+- ``breakpoints``             — static node-level interrupt, approval via CLI
+- ``interactive-breakpoints`` — multi-turn breakpoint loop
+- ``dynamic-breakpoints``     — ``NodeInterrupt`` raised from inside a node
+- ``edit-state``              — modify the last human message before the LLM runs
+- ``human-feedback``          — dedicated feedback node that updates state
+- ``time-travel``             — checkpoint replay and forked state edits
+- ``streaming``               — token-level streaming with summarization
+- ``interactive-chat``        — long-running summarizing REPL
+- ``streaming-events``        — async ``astream_events`` with chunk printing
+
+Usage examples::
+
+    uv run python -m app.module3.main breakpoints --auto-approve
+    uv run python -m app.module3.main time-travel --auto-approve
+    uv run python -m app.module3.main streaming-events
+"""
+
 from __future__ import annotations
 
 import argparse

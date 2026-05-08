@@ -1,3 +1,20 @@
+"""Module 2 CLI entry point.
+
+Runs the summarizing chatbot from the command line.  Supports a single-turn
+``--prompt`` mode and a multi-turn ``--interactive`` REPL.  Conversation state
+is persisted to SQLite so threads survive between process runs.
+
+Usage examples::
+
+    # Single turn
+    uv run python -m app.module2.main --prompt "My favorite color is blue."
+
+    # Interactive REPL
+    uv run python -m app.module2.main --interactive
+
+REPL commands: ``/summary`` (print current summary), ``/exit`` or ``/quit``.
+"""
+
 from __future__ import annotations
 
 import argparse

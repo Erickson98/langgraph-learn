@@ -1,3 +1,24 @@
+"""Module 4 CLI entry point.
+
+Generates a structured research brief from the command line.  The graph plans
+sections, retrieves supporting context from Wikipedia and optionally Tavily,
+drafts each section in parallel subgraphs, synthesizes an executive overview,
+and compiles the final markdown report.
+
+Wikipedia retrieval works without any API key.  Web retrieval is skipped
+unless ``TAVILY_API_KEY`` is set or ``--no-web`` is passed explicitly.
+
+Usage examples::
+
+    uv run python -m app.module4.main "LangGraph for production support agents"
+
+    uv run python -m app.module4.main "AI in healthcare" \\
+        --audience "clinical leadership" \\
+        --sections 3 \\
+        --no-web \\
+        --output data/brief.md
+"""
+
 from __future__ import annotations
 
 import argparse

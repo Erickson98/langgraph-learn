@@ -1,6 +1,21 @@
 # Module 3 Checkpointing Agent
 
-Module 3 demonstrates LangGraph checkpointing patterns: static breakpoints, pending tool approval, state inspection, checkpoint history, replay, forked state edits, human feedback, and streaming events.
+Module 3 demonstrates LangGraph checkpointing patterns using a simple arithmetic agent as the vehicle. The agent can add, multiply, subtract, and divide numbers; most patterns shown here apply equally to any tool-using graph.
+
+Patterns covered:
+
+| Demo | Pattern |
+| --- | --- |
+| `breakpoints` | Static interrupt-before a node; resume after human approval |
+| `interactive-breakpoints` | Multi-turn breakpoint loop |
+| `dynamic-breakpoints` | `NodeInterrupt` raised from inside a node at runtime |
+| `edit-state` | Modify the last human message before the LLM continues |
+| `human-feedback` | Dedicated feedback node that writes approval into state |
+| `time-travel` | Replay execution from a past checkpoint |
+| `time-travel` (fork) | Replace a message and re-run from a historical point |
+| `streaming` | Token-level streaming with automatic summarization |
+| `interactive-chat` | Multi-turn summarizing REPL |
+| `streaming-events` | `astream_events` v2 with per-chunk printing |
 
 ## Runtime
 
@@ -67,6 +82,18 @@ Run replay and fork behavior:
 ```bash
 uv run python -m app.module3.main time-travel --auto-approve
 ```
+
+## File map
+
+| File | Purpose |
+| --- | --- |
+| `schemas.py` | Constants, `PendingToolCall`, `MessageView`, all request/response DTOs |
+| `dependencies.py` | Provider validation, credential checking, `get_chat_model`, FastAPI DI |
+| `routers.py` | `POST /turn`, `POST /approve`, `GET /state`, `GET /history`, `POST /replay`, `POST /fork` |
+| `services/tools.py` | Arithmetic tools (`add`, `multiply`, `subtract`, `divide`) |
+| `services/graph_service.py` | Graph builders, snapshot serializers, checkpoint operations, async wrappers |
+| `services/module_service.py` | Application service used by the router |
+| `main.py` | CLI entry point with nine demo modes |
 
 ## Tests
 
